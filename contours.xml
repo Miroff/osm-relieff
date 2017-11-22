@@ -8,16 +8,18 @@
             <TextSymbolizer face-name="DejaVu Sans Book" size="12" fill="#a86615" halo-radius="3" placement="line" halo-comp-op="dst-out" repeat-distance="100">[ele]</TextSymbolizer>
         </Rule>
         <Rule>
+            <MaxScaleDenominator>60000</MaxScaleDenominator>
             <Filter>[ele] % 100 > 0 and [ele] % 50 = 0</Filter>
             <LineSymbolizer stroke="#a86615" stroke-width="1" />
         </Rule>
         <Rule>
+            <MaxScaleDenominator>20000</MaxScaleDenominator>
             <Filter>[ele] % 100 > 0 and [ele] % 50 > 0</Filter>
             <LineSymbolizer stroke="#a86615" stroke-width="0.5" />
         </Rule>
     </Style>
 
-    <Layer name="N49E083" srs="+init=epsg:4326">
+    <Layer name="N49E083" srs="+proj=latlong +datum=WGS84">
         <StyleName>contours</StyleName>
         <Datasource>
             <Parameter name="file">test.geojson</Parameter>

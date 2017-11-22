@@ -24,37 +24,27 @@ pixelHeight = transform[5]
 def project(point):
     return (xOrigin + (point[1] * pixelWidth) + pixelWidth / 2, yOrigin + (point[0] * pixelHeight) + pixelHeight / 2)
 
-interval = 100
+interval = 10
 
 h0 = (nda.min() / interval) * interval + interval
 h1 = (nda.max() / interval) * interval + interval
 
 features = []
-# for height in xrange(h0, h1, interval):
-#     contours = find_contours(nda, height)
-#     for contour in contours:
-#
-#         coords = map(project, contour)
-#
-#         features.append({
-#             'type': 'Feature',
-#             'geometry': {
-#                 'type': 'LineString',
-#                 'coordinates': coords
-#             },
-#             'properties': {
-#                 'ele': height
-#             }
-#         })
+for height in xrange(h0, h1, interval):
+    contours = find_contours(nda, height)
+    for contour in contours:
 
-#print(json.dumps({'type': 'FeatureCollection', 'features': features}))
+        coords = map(project, contour)
 
-result = maximum_filter(nda, size=200)
+        features.append({
+            'type': 'Feature',
+            'geometry': {
+                'type': 'LineString',
+                'coordinates': coords
+            },
+            'properties': {
+                'ele': height
+            }
+        })
 
-fig = plt.figure()
-plt.gray()  # show the filtered result in grayscale
-ax1 = fig.add_subplot(121)  # left side
-ax2 = fig.add_subplot(122)  # right side
-ax1.imshow(nda)
-ax2.imshow(result)
-plt.show()
+print(json.dumps({'type': 'FeatureCollection', 'features': features}))
