@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 
 <Map srs="+init=epsg:3857">
+  <Style name="peaks">
+      <Rule>
+          <PointSymbolizer file="peak.png"/>
+          <TextSymbolizer face-name="DejaVu Sans Book" size="14" fill="#a86615" halo-radius="10" placement="line" halo-comp-op="dst-out" repeat-distance="100">[ele]</TextSymbolizer>
+      </Rule>
+    </Style>
     <Style name="contours">
         <Rule>
             <Filter>[ele] % 100 = 0</Filter>
@@ -19,49 +25,35 @@
         </Rule>
     </Style>
 
-    <Layer name="N49E083" srs="+proj=latlong +datum=WGS84">
+    <Layer name="N51E086" srs="+proj=latlong +datum=WGS84">
         <StyleName>contours</StyleName>
         <Datasource>
-            <Parameter name="file">test.geojson</Parameter>
+            <Parameter name="file">contours-json/N51E086.json</Parameter>
             <Parameter name="type">geojson</Parameter>
         </Datasource>
     </Layer>
 
-<!--
-    <Layer name="N50E086">
+    <Layer name="N51E087" srs="+proj=latlong +datum=WGS84">
         <StyleName>contours</StyleName>
         <Datasource>
-            <Parameter name="file">contours/N50E086/contour.shp</Parameter>
-            <Parameter name="type">shape</Parameter>
-            <Parameter name="extent">86,50,87,51</Parameter>
+            <Parameter name="file">contours-json/N51E087.json</Parameter>
+            <Parameter name="type">geojson</Parameter>
         </Datasource>
     </Layer>
 
-    <Layer name="N50E087">
+    <Layer name="N50E086" srs="+proj=latlong +datum=WGS84">
         <StyleName>contours</StyleName>
         <Datasource>
-            <Parameter name="file">contours/N50E087/contour.shp</Parameter>
-            <Parameter name="type">shape</Parameter>
-            <Parameter name="extent">87,50,88,51</Parameter>
+            <Parameter name="file">contours-json/N50E086.json</Parameter>
+            <Parameter name="type">geojson</Parameter>
         </Datasource>
     </Layer>
 
-    <Layer name="N51E086">
+    <Layer name="N50E087" srs="+proj=latlong +datum=WGS84">
         <StyleName>contours</StyleName>
         <Datasource>
-            <Parameter name="file">contours/N51E086/contour.shp</Parameter>
-            <Parameter name="type">shape</Parameter>
-            <Parameter name="extent">86,51,87,52</Parameter>
+            <Parameter name="file">contours-json/N50E087.json</Parameter>
+            <Parameter name="type">geojson</Parameter>
         </Datasource>
     </Layer>
-
-    <Layer name="N51E087">
-        <StyleName>contours</StyleName>
-        <Datasource>
-            <Parameter name="file">contours/N51E087/contour.shp</Parameter>
-            <Parameter name="type">shape</Parameter>
-            <Parameter name="extent">87,51,88,52</Parameter>
-        </Datasource>
-    </Layer>
--->
 </Map>

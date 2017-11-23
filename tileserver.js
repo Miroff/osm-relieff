@@ -13,5 +13,13 @@ strata.layer('contours')
         scale: 1
     }));
 
+strata.layer('peaks')
+    .route('*.png')
+    .use(mapnik({
+        pathname: 'peaks.xml',
+        tileSize: 256,
+        scale: 1
+    }));
+
 // start accepting requests
-strata.listen(8080);
+strata.listen(8099);

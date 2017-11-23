@@ -1,3 +1,8 @@
+srtm-hgt
 srtm-tif
 srtm-tif-reprojected
-contours
+contours-json
+peaks-json
+srtm
+node_modules
+mosaic

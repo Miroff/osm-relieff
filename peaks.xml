@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<Map srs="+init=epsg:3857">
+  <Style name="peaks">
+    <Rule>
+      <Filter>[prominence] > 30</Filter>
+      <TextSymbolizer face-name="DejaVu Sans Book" size="24" fill="red" placement="point" dy="20">[ele] + "(" + [prominence] + ")"</TextSymbolizer>
+      <PointSymbolizer file="peak.png"/>
+    </Rule>
+  </Style>
+
+  <Layer name="N51E086" srs="+proj=latlong +datum=WGS84">
+    <StyleName>peaks</StyleName>
+    <Datasource>
+      <Parameter name="file">peaks-json/N51E086.json</Parameter>
+      <Parameter name="type">geojson</Parameter>
+    </Datasource>
+  </Layer>
+</Map>
