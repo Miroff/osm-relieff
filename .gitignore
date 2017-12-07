@@ -1,3 +1,5 @@
+__pycache__
+*.pyc
 srtm-hgt
 srtm-tif
 srtm-tif-reprojected
