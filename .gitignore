@@ -4,6 +4,7 @@ srtm-hgt
 srtm-tif
 srtm-tif-reprojected
 contours-json
+mapnik-config
 peaks-json
 srtm
 node_modules
