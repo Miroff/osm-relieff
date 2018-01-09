@@ -23,7 +23,7 @@ parser.add_argument("-C", "--mapnik-config",
                     default='mapnik-config',
                     help="Mapnik config files directory")
 parser.add_argument("-d", "--dry-run",
-                    default='false',
+                    default=False,
                     help="Dont generate contours")
 
 args = parser.parse_args()
