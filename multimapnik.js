@@ -4,19 +4,51 @@ var SphericalMercator = require('@mapbox/sphericalmercator');
 var async = require("async");
 var fs = require('fs');
 
-var renderers = [];
+var renderers = {};
+
 var sm = new SphericalMercator({ size: 256 });
 
-function find_renderers(bbox) {
-  var result = [];
-  for (var i = 0; i < renderers.length; i++) {
-    var r = renderers[i];
+//TODO: Clean initialized renderes by timestamp of last usage
+
+function find_renderers(server, bbox, callback) {
+  var infos = [];
+  for (var key in renderers) {
+    if (!renderers.hasOwnProperty(key)) {
+      continue;
+    }
+
+    var r = renderers[key];
+
     if (r.bbox[0] > bbox[2] || r.bbox[2] < bbox[0] || r.bbox[1] > bbox[3] || r.bbox[3] < bbox[1]) {
       continue;
     }
-    result.push(r);
+
+    infos.push(key);
   }
-  return result;
+
+  async.map(infos, function (key, cb) {
+    info = renderers[key];
+    if (info.renderer) {
+      return cb(null, info.renderer);
+    }
+
+    var renderer = mapnik({
+        pathname: 'mapnik-config/' + info.mapnik_config,
+        tileSize: 256,
+        scale: 1
+    });
+
+    renderer.init(server, function(err) {
+      if (err) {
+        cb(err);
+      }
+//TODO Remember tile and continue when initialization was finished
+      renderers[info.mapnik_config].renderer = renderer;
+
+      console.log("Renderer for " + info.mapnik_config + " initialized")
+      cb(null, info.renderer);
+    });
+  }, callback);
 }
 
 function init_renderers(server, callback) {
@@ -29,42 +61,54 @@ function init_renderers(server, callback) {
 
       var lat = parseInt(g[1]), lon = parseInt(g[2]);
 
-      var bbox = [lon, lat, lon + 1, lat + 1];
+      var bbox = [lon, lat, lon + 1, lat + 1], mapnik_config = g[0];
 
-      var renderer = mapnik({
-          pathname: 'mapnik-config/' + g[0],
-          tileSize: 256,
-          scale: 1
-      });
-
-      renderers.push({bbox: bbox, renderer});
+      renderers[mapnik_config] = {bbox: bbox, mapnik_config: mapnik_config};
     }
-
-    async.map(renderers, function (r, callback) {
-      callback(null, function(cb) {
-        r.renderer.init(server, function(err) {
-          cb(err);
-        });
-      });
-    }, function(err, functions) {
-      async.series(functions, function(err) {
-        console.log('initialization complete');
-        callback(err);
-      });
-    });
+    console.log("Renderers initialized")
+    callback(null);
   });
 }
 
 
-function serve(bbox, tile, callback) {
-  var rs = find_renderers(bbox);
+function serve(server, bbox, tile, callback) {
+  find_renderers(server, bbox, function(err, renderers) {
+    if (err) {
+      callback(err);
+    }
 
-  if (rs.length == 0) {
-    return callback("renderers not found for bbox " + bbox);
-  }
+    if (renderers.length == 0) {
+      return callback("renderers not found for bbox " + bbox);
+    }
 
-  async.map(rs, function(r, callback) {
-    r.renderer.serve(null, tile, function(err, buffer, headers) {
+    render_tile(tile, renderers, callback);
+  });
+}
+
+function merge_images(images, callback) {
+  var intermediate = new mapnikNative.Image(256, 256);
+  intermediate.premultiply(function (err, intermediate) {
+    if (err) {
+      return callback(err);
+    }
+
+    async.reduce(images, intermediate, function(memo, image, cb) {
+      memo.composite(image, function(err, image) {
+        cb(null, image);
+      });
+    }, function(err, memo) {
+      if (err) {
+        return callback(err);
+      }
+
+      memo.demultiply(callback);
+    });
+  });
+}
+
+function render_tile(tile, renderers, callback) {
+  async.map(renderers, function(renderer, callback) {
+    renderer.serve(null, tile, function(err, buffer, headers) {
       mapnikNative.Image.fromBytes(buffer, function(err, image) {
         image.premultiply(function (err) {
           callback(err, image);
@@ -72,35 +116,24 @@ function serve(bbox, tile, callback) {
       });
     })
   }, function(err, images) {
-    if (err) return callback(err);
+    if (err) {
+      return callback(err);
+    }
 
-    var intermediate = new mapnikNative.Image(256, 256);
-    intermediate.premultiply(function (err, intermediate) {
+    merge_images(images, function (err, image) {
       if (err) {
         return callback(err);
       }
 
-      async.reduce(images, intermediate, function(memo, image, cb) {
-          memo.composite(image, function(err, image) {
-            cb(null, image);
-          });
-        }, function(err, memo) {
-          if (err) {
-            return callback(err);
-          }
+      image.encode('png', function(err, buffer) {
+        if (err) {
+          return callback(err);
+        }
 
-          memo.demultiply(function (err, memo) {
-            memo.encode('png', function(err, buffer) {
-              if (err) {
-                return callback(err);
-              }
-
-            callback(null, buffer, {'Content-Type': 'image/png'});
-          });
-        })
+        callback(null, buffer, {'Content-Type': 'image/png'});
       });
     });
-  })
+  });
 }
 
 module.exports = function() {
@@ -113,7 +146,7 @@ module.exports = function() {
     serve: function(server, tile, callback) {
       var bbox = sm.bbox(tile.x, tile.y, tile.z);
 
-      serve(bbox, tile, callback);
+      serve(server, bbox, tile, callback);
     },
     destroy: function(server, callback) {
       //TODO: Destroy renderers
