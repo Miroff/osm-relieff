@@ -22,12 +22,12 @@ function find_renderers(server, bbox, callback) {
     if (r.bbox[0] > bbox[2] || r.bbox[2] < bbox[0] || r.bbox[1] > bbox[3] || r.bbox[3] < bbox[1]) {
       continue;
     }
-
     infos.push(key);
   }
 
   async.map(infos, function (key, cb) {
     info = renderers[key];
+
     if (info.renderer) {
       return cb(null, info.renderer);
     }
@@ -63,6 +63,7 @@ function init_renderers(server, callback) {
 
       var bbox = [lon, lat, lon + 1, lat + 1], mapnik_config = g[0];
 
+
       renderers[mapnik_config] = {bbox: bbox, mapnik_config: mapnik_config};
     }
     console.log("Renderers initialized")
@@ -74,6 +75,7 @@ function init_renderers(server, callback) {
 function serve(server, bbox, tile, callback) {
   find_renderers(server, bbox, function(err, renderers) {
     if (err) {
+      console.log(err);
       callback(err);
     }
 
