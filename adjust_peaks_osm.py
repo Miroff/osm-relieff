@@ -10,7 +10,7 @@ reload(sys)
 sys.setdefaultencoding('utf-8')
 
 latlonProj = Proj(init='epsg:4326')
-#TODO: Use more suitable mercator here
+# TODO: Use more suitable mercator here to more uniform distance calculations
 xyProj = Proj(init='epsg:3857')
 
 

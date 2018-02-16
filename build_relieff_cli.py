@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-I", "--input", help="Input directory",
+parser.add_argument("-I", "--input", help="Input directory or a single file",
                     default="srtm-tif")
 parser.add_argument("-OC", "--output-contours", help="Contours Output directory",
                     default="contours-json")
@@ -34,12 +34,17 @@ parser.add_argument("-NC", "--no-contours",
 
 args = parser.parse_args()
 
-files = os.listdir(args.input)
+files = []
+if os.path.isdir(args.input):
+    files = map(lambda f: os.path.join(args.input, f), os.listdir(args.input))
+else:
+    files = [args.input]
+
 files = filter(lambda f: os.path.splitext(f)[1].lower() == ".tif", files)
 files = sorted(files)
 
-for f in tqdm(files):
-    fin = os.path.join(args.input, f)
+for fin in tqdm(files):
+    f = os.path.basename(fin)
     name = re.sub(r'(.*?).hgt.tif$', "\\1", f)
     fout = re.sub(r'(.*?).hgt.tif$', "\\1.json", f)
 
@@ -54,7 +59,9 @@ for f in tqdm(files):
         find_peaks(fin, fout_peaks, int(args.interval), min_prominence=50)
 
     with open(args.mapnik_config_template) as rh:
+        config_file = os.path.join(args.mapnik_config, name + ".xml")
+        print("Writing Mapnik config %s" % config_file)
         tmpl = str(rh.read())
         tmpl = re.sub(r'\{NAME\}', name, tmpl)
-        with open(os.path.join(args.mapnik_config, name + ".xml"), 'w') as wh:
+        with open(config_file, 'w') as wh:
             wh.write(tmpl)

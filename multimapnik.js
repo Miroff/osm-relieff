@@ -32,6 +32,7 @@ function find_renderers(server, bbox, callback) {
       return cb(null, info.renderer);
     }
 
+    console.log(renderers);
     var renderer = mapnik({
         pathname: 'mapnik-config/' + info.mapnik_config,
         tileSize: 256,
@@ -146,9 +147,24 @@ module.exports = function() {
     },
 
     serve: function(server, tile, callback) {
+      var k = tile.z + "/" + tile.x + "/" + tile.y;
+      var t0 = Date.now();
+      var done = false;
+      console.log("Begin ", k)
+      setTimeout(function() {
+        if (!done) {
+          console.log("Timeout!!! " + k);
+        }
+      }, 10000)
+
       var bbox = sm.bbox(tile.x, tile.y, tile.z);
 
-      serve(server, bbox, tile, callback);
+      serve(server, bbox, tile, function(err, buffer, headers) {
+        done = true;
+        t1 = Date.now()
+        console.log("End " + k + " in " + (t1 - t0) + "ms");
+        callback(err, buffer, headers);
+      });
     },
     destroy: function(server, callback) {
       //TODO: Destroy renderers

@@ -5,8 +5,10 @@ import logging
 from osgeo import gdal
 import geojson
 from shapely.geometry import Polygon, LineString
-from geojson import Point, Feature, FeatureCollection
+from shapely import ops
 from shapely.strtree import STRtree
+from shapely.validation import explain_validity
+from geojson import Point, Feature, FeatureCollection
 from operator import attrgetter
 from skimage.measure import find_contours
 from skimage.filters import gaussian
@@ -53,11 +55,11 @@ def find_summits(nda, contours, min_prominence):
 
     for p in tqdm(contours):
         # Heuristic to reduce
-#        if p.area > 0.000002:
-#            continue
+        if p.area > 1000:
+            continue
 
         inner = contour_tree.query(p)
-        inner = filter(lambda a: a.ele > p.ele, inner)
+        inner = filter(lambda inner_contour: inner_contour.ele > p.ele, inner)
         inner = sorted(inner, key=attrgetter('ele'), reverse=True)
 
         miss = False
@@ -139,16 +141,52 @@ def find_peaks(fin, fout, interval=5, min_prominence=50):
         p.prominence = geom.prominence
         return p
 
+    w = nda.shape[0] - 1
+    h = nda.shape[1] - 1
+    bbox = LineString([
+        [0, 0],
+        [0, h],
+        [w, h],
+        [w, 0],
+        [0, 0]
+    ])
+
     def contour_to_polygon(ele):
         def doJob(contour):
+            contour = list(contour)
             if (len(contour) < 3):
+                logger.warn("Contour contains less than 3 points")
                 return None
-#            ls = LineString(map(project, contour))
             ls = LineString(contour)
-            if not ls.is_ring:
-                return None
+            if ls.is_ring:
+                polygon = Polygon(ls)
+            else:
+                lss = ls.union(bbox)
+                result, dangles, cuts, invalids = ops.polygonize_full(lss)
+                if dangles or cuts or invalids:
+                    print contour
+                    print result
+                    print dangles
+                    print cuts
+                    print invalids
+                    logger.warn("Invalid geometry")
+                    exit()
 
-            polygon = Polygon(ls)
+                if len(result) != 2:
+                    logger.warn("Sanity check 1")
+                    exit()
+
+                r1 = result[0].exterior.intersection(ls)
+                r2 = result[1].exterior.intersection(ls)
+
+                if r1.geoms[0].coords[0:2] == ls.coords[0:2]:
+                    polygon = r1
+                elif r2.geoms[0].coords[0:2] == ls.coords[0:2]:
+                    polygon = r2
+                else:
+                    logger.warn("Sanity check 2")
+                    exit()
+
             if not polygon.is_valid:
                 logger.warn("Polygon is not valid")
                 return None
