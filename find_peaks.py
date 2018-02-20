@@ -1,19 +1,15 @@
 #!/usr/bin/env python3
+import matplotlib.pyplot as plt
+from descartes import PolygonPatch
 
 from tqdm import tqdm
 import logging
 from osgeo import gdal
 import geojson
-from shapely.geometry import Polygon, LineString
+from shapely.geometry import Polygon, LineString, MultiPolygon
 from shapely import ops
-from shapely.strtree import STRtree
-from shapely.validation import explain_validity
 from geojson import Point, Feature, FeatureCollection
-from operator import attrgetter
 from skimage.measure import find_contours
-from skimage.filters import gaussian
-from skimage import img_as_float
-from scipy.ndimage.filters import gaussian_filter
 import numpy as np
 import cv2
 
@@ -26,7 +22,7 @@ def adjust_peak(nda, polygon):
     con_mask = np.zeros((nda.shape[0], nda.shape[1], 1), np.uint8)
     cv2.drawContours(con_mask, [coords.astype(int)], 0, 255, -1)
 
-    #Compensate coordinates conversion to integer
+    # Compensate coordinates conversion to integer
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
     con_mask = cv2.dilate(con_mask, kernel, iterations=1)
 
@@ -41,69 +37,84 @@ def adjust_peak(nda, polygon):
     # cv2.waitKey(0)
     # cv2.destroyAllWindows()
 
-    peak = Point(max_pos) #(max_pos[1], max_pos[0])
+    peak = Point(max_pos)
     peak.ele = nda[max_pos]
     return peak
 
 
-def find_summits(nda, contours, min_prominence):
-    print("Building contours tree")
-    contour_tree = STRtree(contours)
-
-    print("Finding potential summits")
+def build_hierarchy(elevations, polygons):
+    print("Building hierarchy")
     summits = []
+    for high, low in zip(elevations, elevations[1:]):
+        ele, top = filter(lambda p: p[0] == high, polygons)[0]
+        ele, bottom = filter(lambda p: p[0] == low, polygons)[0]
 
-    for p in tqdm(contours):
-        # Heuristic to reduce
-        if p.area > 1000:
-            continue
+        for tp in top:
+            tp.ele = high
+            for bp in bottom:
+                bp.ele = low
 
-        inner = contour_tree.query(p)
-        inner = filter(lambda inner_contour: inner_contour.ele > p.ele, inner)
-        inner = sorted(inner, key=attrgetter('ele'), reverse=True)
+            if not hasattr(tp, 'children'):
+                tp.children = []
+            parents = filter(lambda bp: bp.contains(tp), bottom)
 
-        miss = False
-        for c in inner:
-            if p.contains(c):
-                miss = True
-                break
-        if not miss:
-            summits.append(p)
+            if len(parents) != 1:
+                print parents
+                raise Exception("Peak is in more than one lower contour")
 
-    print("Found %d potential summits" % len(summits))
-    summit_tree = STRtree(summits)
+            parent = parents[0]
+            tp.parent = parent
+            if not hasattr(parent, 'children'):
+                parent.children = []
+            parent.children.append(tp)
 
-    result = []
-    for s in tqdm(summits):
-        point = s.representative_point()
-        outer = contour_tree.query(point)
-        outer = filter(lambda a: a.ele < s.ele, outer)
-        outer = sorted(outer, key=attrgetter('ele'), reverse=True)
+            summits.append((high, tp))
 
-        key = None
-        for contour in outer:
-            concurents = summit_tree.query(contour)
-            concurents = filter(lambda peak: peak.ele > s.ele, concurents)
+    roots = []
+    for ele, summit in summits:
+        if not summit.children:
+            roots.append(summit)
 
-            miss = False
-            for peak in concurents:
-                if contour.contains(peak):
-                    miss = True
-                    break
+    return roots
 
-            if not miss:
-                key = contour
-            else:
-                break
 
-        if key:
-            peak = adjust_peak(nda, s)
+def recusrive_descent(node, ele):
+    if not hasattr(node, 'parent'):
+        return node
+    parent = node.parent
+    if recurcive_ascend(parent, node, ele):
+        return node
+    else:
+        return recusrive_descent(parent, ele)
+
+
+def recurcive_ascend(node, prev, ele):
+    children = filter(lambda child: child != prev, node.children)
+
+    for child in children:
+        if child.ele > ele or recurcive_ascend(child, node, ele):
+            return True
+
+    return False
+
+
+def find_summits(nda, elevations, polygons, min_prominence):
+    candidates = build_hierarchy(elevations, polygons)
+    candidates = filter(lambda a: not hasattr(a, "touches_edge"), candidates)
+
+    print "Found %d summit candidates" % len(candidates)
+    summits = []
+    for candidate in tqdm(candidates):
+        key = recusrive_descent(candidate, candidate.ele)
+
+        if candidate.ele - key.ele > min_prominence:
+            peak = adjust_peak(nda, candidate)
             peak.prominence = peak.ele - key.ele
-            if peak.prominence > min_prominence:
-                result.append(peak)
+            summits.append(peak)
 
-    print("Found %d summits" % len(result))
-    return result
+    print("Found %d summits" % len(summits))
+
+    return summits
 
 
 def summits_to_features(summits):
@@ -117,12 +128,86 @@ def summit_to_feature(summit):
         })
 
 
+def debug_render(geom):
+    fig, ax = plt.subplots()
+    ax.add_patch(PolygonPatch(geom, fc='#aa0000'))
+    ax.grid()
+    ax.axis('equal')
+    plt.show()
+
+
+def merge_lines(lines, bbox):
+    convex = ops.cascaded_union(lines).union(bbox)
+    convex = filter(lambda l: bbox.contains(l), convex)
+
+    polygons = []
+    lines = list(lines)
+    while lines:
+        line = lines.pop()
+        merged = [line]
+
+        first = line.coords[0]
+        last = line.coords[-1]
+        while first != last:
+            nxt = filter(lambda l: l.coords[0] == last, lines)
+            if len(nxt) > 1:
+                raise Exception("More then one line in lines list")
+            if len(nxt) == 1:
+                line = nxt[0]
+                merged.append(line)
+                lines.remove(line)
+                last = line.coords[-1]
+                continue
+            nxt = filter(lambda l: l.coords[0] == last, convex)
+            if len(nxt) > 1:
+                raise Exception("More then one line in lines list")
+            if len(nxt) == 1:
+                line = nxt[0]
+                merged.append(line)
+                convex.remove(line)
+                last = line.coords[-1]
+                continue
+            else:
+                raise Exception("Cannot find next line")
+
+        result, dangles, cuts, invalids = ops.polygonize_full(merged)
+        if len(result) != 1:
+            raise Exception("Merged lines should produce a single polygon")
+        polygon = result[0]
+        polygons.append(polygon)
+
+    return polygons
+
+
+def contour_to_polygon(contours, bbox):
+    result = MultiPolygon()
+    lines = []
+    for contour in contours:
+        contour = list(contour)
+        if (len(contour) < 3):
+            raise Exception("Contour contains less than 3 points")
+
+        ls = LineString(contour)
+        if ls.is_ring:
+            result = result.union(Polygon(ls))
+        else:
+            lines.append(ls)
+
+    if lines:
+        multi = MultiPolygon(merge_lines(lines, bbox))
+        # I have no idea why this polyon is negative :(
+        multi = Polygon(bbox).difference(multi)
+        result = result.union(multi)
+
+    return result
+
+
 def find_peaks(fin, fout, interval=5, min_prominence=50):
     ds = gdal.Open(fin)
     nda = ds.ReadAsArray().astype(float)
     nda = nda + 0.5
     # TODO: Debug remove
-    # nda = nda[:500, :500]
+    #nda = nda[:500, :500]
 
     transform = ds.GetGeoTransform()
     xOrigin = transform[0]
@@ -145,70 +230,44 @@ def find_peaks(fin, fout, interval=5, min_prominence=50):
     h = nda.shape[1] - 1
     bbox = LineString([
         [0, 0],
-        [0, h],
-        [w, h],
         [w, 0],
+        [w, h],
+        [0, h],
         [0, 0]
     ])
 
-    def contour_to_polygon(ele):
-        def doJob(contour):
-            contour = list(contour)
-            if (len(contour) < 3):
-                logger.warn("Contour contains less than 3 points")
-                return None
-            ls = LineString(contour)
-            if ls.is_ring:
-                polygon = Polygon(ls)
-            else:
-                lss = ls.union(bbox)
-                result, dangles, cuts, invalids = ops.polygonize_full(lss)
-                if dangles or cuts or invalids:
-                    print contour
-                    print result
-                    print dangles
-                    print cuts
-                    print invalids
-                    logger.warn("Invalid geometry")
-                    exit()
-
-                if len(result) != 2:
-                    logger.warn("Sanity check 1")
-                    exit()
-
-                r1 = result[0].exterior.intersection(ls)
-                r2 = result[1].exterior.intersection(ls)
-
-                if r1.geoms[0].coords[0:2] == ls.coords[0:2]:
-                    polygon = r1
-                elif r2.geoms[0].coords[0:2] == ls.coords[0:2]:
-                    polygon = r2
-                else:
-                    logger.warn("Sanity check 2")
-                    exit()
-
-            if not polygon.is_valid:
-                logger.warn("Polygon is not valid")
-                return None
-
-            # TODO: Use actual maximum from DEM here
-            polygon.ele = ele - 0.5
-            return polygon
-        return doJob
-
     h0 = (int(nda.min()) / interval) * interval + interval
     h1 = (int(nda.max()) / interval) * interval + interval
+    elevations = range(h1, h0, -interval)
 
     # print("Blurring image")
     # nda = gaussian_filter(nda, 3)
     print("Calculating polygon contours")
-    contours = []
-    for ele in tqdm(xrange(h0, h1, interval)):
-        contours = contours + filter(lambda a: a, map(contour_to_polygon(ele), find_contours(nda, ele)))
+    polygons = []
+    for ele in tqdm(elevations):
+        contours = find_contours(nda, ele)
 
-    print("Found %d polygons" % len(contours))
+        polygon = contour_to_polygon(contours, bbox)
+        pp = []
+        if type(polygon) == Polygon:
+            pp = [polygon]
+        elif type(polygon) == MultiPolygon:
+            pp = list(polygon.geoms)
+        else:
+            raise Exception("Unexpected object type")
+        # pair = (ele, [polygon])
 
-    summits = map(project, find_summits(nda, contours, min_prominence))
+        for p in pp:
+            if p.touches(bbox):
+                p.touches_edge = True
+
+        polygons.append((ele, pp))
+
+    print("Found %d polygons" % len(polygons))
+
+    summits_px = find_summits(nda, elevations, polygons, min_prominence)
+
+    summits = map(project, summits_px)
 
     features = FeatureCollection(summits_to_features(summits))
 
