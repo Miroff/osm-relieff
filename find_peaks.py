@@ -88,7 +88,7 @@ def find_summits(nda, elevations, polygons, min_prominence):
 
     logger.info("Found %d summit candidates" % len(candidates))
     summits = []
-    candidates = map(lambda polygon: adjust_peak(nda, polygon), candidates)
+    candidates = map(lambda polygon: adjust_peak(nda, polygon), tqdm(candidates))
     logger.info("Adjusted peaks height")
     peaks = sorted(candidates, key=attrgetter('ele'), reverse=True)
     for i, peak in tqdm(enumerate(peaks)):
@@ -100,8 +100,8 @@ def find_summits(nda, elevations, polygons, min_prominence):
             key = key.parent
             path.append(key)
 
-        if peak.ele - key.ele > min_prominence:
-            logger.debug("Peak #%d, elevation %f contour elevation %f (%f)" % (i, peak.ele, key.key_ele, key.ele))
+        if peak.ele - key.ele > min_prominence and peak.ele > key.key_ele:
+            logger.info("Peak #%d, elevation %f contour elevation %f (%f)" % (i, peak.ele, key.key_ele, key.ele))
 
             peak.prominence = peak.ele - key.ele
             peak.index_in_session = i
@@ -201,12 +201,12 @@ def contour_to_polygon(contours, bbox):
     return result
 
 
-def find_peaks(fin, fout, interval=5, min_prominence=50):
+def find_peaks(fin, fout, interval=5, min_prominence=30):
     ds = gdal.Open(fin)
     nda = ds.ReadAsArray().astype(float)
     nda = nda + 0.5
     # TODO: Debug remove
-    nda = nda[:1000, :1000]
+    #nda = nda[:1000, :1000]
 
     transform = ds.GetGeoTransform()
     xOrigin = transform[0]
