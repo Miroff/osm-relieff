@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
+from operator import attrgetter
+import logging
+
+from tqdm import tqdm
 import matplotlib.pyplot as plt
 from descartes import PolygonPatch
 
-from tqdm import tqdm
-import logging
-from osgeo import gdal
-import geojson
-from shapely.geometry import Polygon, LineString, MultiPolygon
-from shapely import ops
-from geojson import Point, Feature, FeatureCollection
 from skimage.measure import find_contours
 import numpy as np
 import cv2
+
+from osgeo import gdal
+from shapely.geometry import Polygon, LineString, MultiPolygon
+from shapely import ops
+import geojson
+from geojson import Point, Feature, FeatureCollection
 
 
 logger = logging.getLogger()
@@ -30,22 +33,16 @@ def adjust_peak(nda, polygon):
     argmax = fg.argmax()
     max_pos = np.unravel_index(argmax, fg.shape)
 
-    # dbg = np.zeros((nda.shape[0], nda.shape[1], 3), np.uint8)
-    # cv2.drawContours(dbg, [coords.astype(int)], -1, (0,255,0), 1)
-    #
-    # cv2.imshow('image', con_mask)
-    # cv2.waitKey(0)
-    # cv2.destroyAllWindows()
-
     peak = Point(max_pos)
     peak.ele = nda[max_pos]
+    peak.contour = polygon
     return peak
 
 
 def build_hierarchy(elevations, polygons):
-    print("Building hierarchy")
+    logger.info("Building hierarchy")
     summits = []
-    for high, low in zip(elevations, elevations[1:]):
+    for high, low in tqdm(zip(elevations, elevations[1:])):
         ele, top = filter(lambda p: p[0] == high, polygons)[0]
         ele, bottom = filter(lambda p: p[0] == low, polygons)[0]
 
@@ -59,15 +56,22 @@ def build_hierarchy(elevations, polygons):
             parents = filter(lambda bp: bp.contains(tp), bottom)
 
             if len(parents) != 1:
-                print parents
                 raise Exception("Peak is in more than one lower contour")
 
             parent = parents[0]
             tp.parent = parent
             if not hasattr(parent, 'children'):
                 parent.children = []
-            parent.children.append(tp)
+            if not hasattr(tp, 'key_ele'):
+                tp.key_ele = high
 
+            if not hasattr(parent, 'key_ele'):
+                parent.key_ele = 0
+
+            if parent.key_ele < tp.key_ele:
+                parent.key_ele = tp.key_ele
+
+            parent.children.append(tp)
             summits.append((high, tp))
 
     roots = []
@@ -78,41 +82,35 @@ def build_hierarchy(elevations, polygons):
     return roots
 
 
-def recusrive_descent(node, ele):
-    if not hasattr(node, 'parent'):
-        return node
-    parent = node.parent
-    if recurcive_ascend(parent, node, ele):
-        return node
-    else:
-        return recusrive_descent(parent, ele)
-
-
-def recurcive_ascend(node, prev, ele):
-    children = filter(lambda child: child != prev, node.children)
-
-    for child in children:
-        if child.ele > ele or recurcive_ascend(child, node, ele):
-            return True
-
-    return False
-
-
 def find_summits(nda, elevations, polygons, min_prominence):
     candidates = build_hierarchy(elevations, polygons)
     candidates = filter(lambda a: not hasattr(a, "touches_edge"), candidates)
 
-    print "Found %d summit candidates" % len(candidates)
+    logger.info("Found %d summit candidates" % len(candidates))
     summits = []
-    for candidate in tqdm(candidates):
-        key = recusrive_descent(candidate, candidate.ele)
+    candidates = map(lambda polygon: adjust_peak(nda, polygon), candidates)
+    logger.info("Adjusted peaks height")
+    peaks = sorted(candidates, key=attrgetter('ele'), reverse=True)
+    for i, peak in tqdm(enumerate(peaks)):
+        key = peak.contour
+        path = [key]
 
-        if candidate.ele - key.ele > min_prominence:
-            peak = adjust_peak(nda, candidate)
+        #TODO: Not sure this condition is correct
+        while hasattr(key, 'parent') and key.parent.key_ele <= peak.ele and not hasattr(key, "touches_edge"):
+            key = key.parent
+            path.append(key)
+
+        if peak.ele - key.ele > min_prominence:
+            logger.debug("Peak #%d, elevation %f contour elevation %f (%f)" % (i, peak.ele, key.key_ele, key.ele))
+
             peak.prominence = peak.ele - key.ele
+            peak.index_in_session = i
             summits.append(peak)
 
-    print("Found %d summits" % len(summits))
+            for k in path:
+                k.key_ele = peak.ele
+
+    logger.info("Found %d summits" % len(summits))
 
     return summits
 
@@ -124,7 +122,8 @@ def summits_to_features(summits):
 def summit_to_feature(summit):
     return Feature(geometry=summit, properties={
             'ele': summit.ele,
-            'prominence': summit.prominence
+            'prominence': summit.prominence,
+            'index_in_session': summit.index_in_session
         })
 
 
@@ -207,7 +206,7 @@ def find_peaks(fin, fout, interval=5, min_prominence=50):
     nda = ds.ReadAsArray().astype(float)
     nda = nda + 0.5
     # TODO: Debug remove
-    #nda = nda[:500, :500]
+    nda = nda[:1000, :1000]
 
     transform = ds.GetGeoTransform()
     xOrigin = transform[0]
@@ -224,6 +223,7 @@ def find_peaks(fin, fout, interval=5, min_prominence=50):
         p = Point(latlon)
         p.ele = geom.ele
         p.prominence = geom.prominence
+        p.index_in_session = geom.index_in_session
         return p
 
     w = nda.shape[0] - 1
@@ -242,7 +242,7 @@ def find_peaks(fin, fout, interval=5, min_prominence=50):
 
     # print("Blurring image")
     # nda = gaussian_filter(nda, 3)
-    print("Calculating polygon contours")
+    logger.info("Calculating polygon contours")
     polygons = []
     for ele in tqdm(elevations):
         contours = find_contours(nda, ele)
@@ -263,7 +263,7 @@ def find_peaks(fin, fout, interval=5, min_prominence=50):
 
         polygons.append((ele, pp))
 
-    print("Found %d polygons" % len(polygons))
+    logger.info("Found %d polygons" % len(polygons))
 
     summits_px = find_summits(nda, elevations, polygons, min_prominence)
 

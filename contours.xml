@@ -1,13 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 
 <Map srs="+init=epsg:3857">
+<!--
     <Style name="peaks">
         <Rule>
             <TextSymbolizer face-name="DejaVu Sans Book" size="24" fill="red" placement="point" dy="20">([ele])</TextSymbolizer>
             <PointSymbolizer file="peak.png"/>
         </Rule>
     </Style>
-
+-->
     <Style name="contours">
         <Rule>
             <MaxScaleDenominator>140000</MaxScaleDenominator>
@@ -17,7 +18,6 @@
         </Rule>
         <Rule>
             <MaxScaleDenominator>60000</MaxScaleDenominator>
-            <MinScaleDenominator>20000</MinScaleDenominator>
             <Filter>[ele] % 100 > 0 and [ele] % 50 = 0</Filter>
             <LineSymbolizer stroke="#a86615" stroke-width="1" />
         </Rule>
@@ -35,7 +35,7 @@
             <Parameter name="type">geojson</Parameter>
         </Datasource>
     </Layer>
-
+<!--
     <Layer name="{NAME}" srs="+proj=latlong +datum=WGS84">
       <StyleName>peaks</StyleName>
       <Datasource>
@@ -43,4 +43,5 @@
         <Parameter name="type">geojson</Parameter>
       </Datasource>
     </Layer>
+-->
 </Map>
