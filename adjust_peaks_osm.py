@@ -57,7 +57,7 @@ def adjust(osm_peak, new_position):
     x = new_position.coords[0][0]
     y = new_position.coords[0][1]
     lon, lat = transform(xyProj, latlonProj, x, y)
-    print "<node id=\"%s\" version=\"%d\" action=\"modify\" visible=\"true\" lat=\"%f\" lon=\"%f\">" % (osm_peak.id, osm_peak.version + 1, lat, lon)
+    print "<node id=\"%s\" version=\"%d\" action=\"modify\" visible=\"true\" lat=\"%f\" lon=\"%f\">" % (osm_peak.id, osm_peak.version, lat, lon)
     for k in osm_peak.tags:
         print "  <tag k=\"%s\" v=\"%s\" />" % (k, osm_peak.tags[k])
     if 'ele' not in osm_peak.tags:
@@ -74,6 +74,7 @@ def append(id, new_position):
     print "  <tag k=\"source\" v=\"srtm-adjust\" />"
     print "</node>"
 
+#TODO get bbox from sqare name
 bbox = (51, 86, 52, 87)
 srtm = read_file('peaks-json/N51E086.json')
 osm = read_overpass(bbox)
@@ -81,11 +82,14 @@ osm = read_overpass(bbox)
 osm_tree = STRtree(osm)
 
 osm_id_placeholder = -1
+#TODO argument of a function
+merge_radius_m = 150
 
+#TODO: write XML to file instead of stdout
 print """<?xml version='1.0' encoding='UTF-8'?>
 <osm version='0.6' generator='JOSM'>"""
 for peak in srtm:
-    candidates = osm_tree.query(peak.buffer(100))
+    candidates = osm_tree.query(peak.buffer(merge_radius_m))
     candidates = sorted(candidates, cmp=lambda a, b: cmp(a.distance(peak), b.distance(peak)))
     if candidates:
         best_choice = candidates[0]
