@@ -6,10 +6,11 @@
   "dependencies": {
     "@mapbox/sphericalmercator": "^1.0.5",
     "async": "^2.6.0",
+    "generic-pool": "^3.4.2",
+    "mapnik": "^4.0.1",
     "tilelive": "^5.12.3",
     "tilestrata": "^2.1.2",
-    "tilestrata-disk": "^0.5.0",
-    "tilestrata-mapnik": "^0.4.1"
+    "tilestrata-disk": "^0.5.0"
   },
   "devDependencies": {},
   "scripts": {

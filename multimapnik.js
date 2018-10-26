@@ -1,4 +1,4 @@
-var mapnik = require('tilestrata-mapnik');
+var mapnik = require('./tilestrata-mapnik.js');
 var mapnikNative = require('mapnik');
 var SphericalMercator = require('@mapbox/sphericalmercator');
 var async = require("async");
@@ -36,7 +36,7 @@ function find_renderers(server, bbox, callback) {
     var renderer = mapnik({
         pathname: 'mapnik-config/' + info.mapnik_config,
         tileSize: 256,
-        scale: 1
+//        poolSize: 1
     });
 
     renderer.init(server, function(err) {
@@ -150,19 +150,14 @@ module.exports = function() {
       var k = tile.z + "/" + tile.x + "/" + tile.y;
       var t0 = Date.now();
       var done = false;
-      console.log("Begin ", k)
-      setTimeout(function() {
-        if (!done) {
-          console.log("Timeout!!! " + k);
-        }
-      }, 10000)
+      // console.log("Begin ", k)
 
       var bbox = sm.bbox(tile.x, tile.y, tile.z);
 
       serve(server, bbox, tile, function(err, buffer, headers) {
         done = true;
         t1 = Date.now()
-        console.log("End " + k + " in " + (t1 - t0) + "ms");
+        // console.log("End " + k + " in " + (t1 - t0) + "ms");
         callback(err, buffer, headers);
       });
     },
