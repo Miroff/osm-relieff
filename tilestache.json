@@ -1,0 +1,21 @@
+{
+  "cache": {
+    "name": "Disk",
+    "path": "cache",
+    "dirs": "portable"
+  },
+  "layers": {
+    "contours": {
+        "provider": {
+          "name": "mapnik",
+          "mapfile": "mapnik-config/N49E085.xml"
+        },
+        "projection": "spherical mercator",
+        "metatile": {
+          "rows": 16,
+          "columns": 16,
+          "buffer": 0
+        }
+    }
+  }
+}

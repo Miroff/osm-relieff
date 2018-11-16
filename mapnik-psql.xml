@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<Map srs="+init=epsg:3857">
+    <Style name="contours">
+        <Rule>
+            <MaxScaleDenominator>140000</MaxScaleDenominator>
+            <Filter>[ele] % 100 = 0</Filter>
+            <LineSymbolizer stroke="#a86615" stroke-width="2" />
+            <TextSymbolizer face-name="DejaVu Sans Book" size="12" fill="#a86615" halo-radius="3" placement="line" halo-comp-op="dst-out" repeat-distance="100">[ele]</TextSymbolizer>
+        </Rule>
+        <Rule>
+            <MaxScaleDenominator>60000</MaxScaleDenominator>
+            <Filter>[ele] % 100 > 0 and [ele] % 50 = 0</Filter>
+            <LineSymbolizer stroke="#a86615" stroke-width="1" />
+        </Rule>
+        <Rule>
+            <MaxScaleDenominator>20000</MaxScaleDenominator>
+            <Filter>[ele] % 100 > 0 and [ele] % 50 > 0</Filter>
+            <LineSymbolizer stroke="#a86615" stroke-width="0.5" />
+        </Rule>
+    </Style>
+
+    <Layer name="contours" srs="+proj=latlong +datum=WGS84">
+        <StyleName>contours</StyleName>
+        <Datasource>
+            <Parameter name="type">postgis</Parameter>
+            <Parameter name="host">localhost</Parameter>
+            <Parameter name="dbname">relief</Parameter>
+            <Parameter name="user">relief</Parameter>
+            <Parameter name="password">relieff</Parameter>
+            <Parameter name="table">relief</Parameter>
+            <Parameter name="geometry_field">wkb_geometry</Parameter>
+        </Datasource>
+    </Layer>
+</Map>

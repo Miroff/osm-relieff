@@ -9,3 +9,5 @@ peaks-json
 srtm
 node_modules
 mosaic
+cache
+package-lock.json

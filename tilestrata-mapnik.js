@@ -4,6 +4,7 @@ var path = require('path');
 var genericPool = require('generic-pool');
 
 mapnik.register_datasource(path.join(mapnik.settings.paths.input_plugins, 'geojson.input'));
+mapnik.register_datasource(path.join(mapnik.settings.paths.input_plugins, 'postgis.input'));
 
 module.exports = function(options) {
   var pool;
@@ -18,13 +19,17 @@ module.exports = function(options) {
         return new Promise(function(resolve, reject) {
           var map = new mapnik.Map(options.tileSize, options.tileSize);
           map.load(options.pathname, function(err) {
-            if (err) reject(err);
-            console.log("Map initialized");
-            resolve(map);
+            if (err !== null) {
+              throw err;
+              reject(err);
+            } else {
+              resolve(map);
+            }
           });
         });
       },
       destroy: function(map) {
+        console.log("destroy Map");
         delete map;
       }
     }, {max: options.poolSize || process.env.UV_THREADPOOL_SIZE || require('os').cpus().length});
@@ -88,6 +93,8 @@ module.exports = function(options) {
 
     var image = new mapnik.Image(meta.width, meta.height);
     map.render(image, options, function(err, image) {
+      if (err) throw err;
+
       process.nextTick(function() {
         // Release after the .render() callback returned
         // to avoid mapnik errors.
