@@ -76,7 +76,7 @@ def append(id, new_position):
 
 #TODO get bbox from sqare name
 bbox = (51, 86, 52, 87)
-srtm = read_file('peaks-json/N51E086.json')
+srtm = read_file('peaks-json/N49E085.json')
 osm = read_overpass(bbox)
 
 osm_tree = STRtree(osm)

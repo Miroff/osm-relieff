@@ -53,9 +53,14 @@ def build_hierarchy(elevations, polygons):
 
             if not hasattr(tp, 'children'):
                 tp.children = []
+
             parents = filter(lambda bp: bp.contains(tp), bottom)
 
-            if len(parents) != 1:
+            if len(parents) == 0:
+                continue
+
+            if len(parents) > 1:
+                print(parents)
                 raise Exception("Peak is in more than one lower contour")
 
             parent = parents[0]
@@ -184,7 +189,8 @@ def contour_to_polygon(contours, bbox):
     for contour in contours:
         contour = list(contour)
         if (len(contour) < 3):
-            raise Exception("Contour contains less than 3 points")
+            continue
+            #raise Exception("Contour contains less than 3 points")
 
         ls = LineString(contour)
         if ls.is_ring:

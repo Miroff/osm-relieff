@@ -8,7 +8,7 @@
     "contours": {
         "provider": {
           "name": "mapnik",
-          "mapfile": "mapnik-config/N49E085.xml"
+          "mapfile": "mapnik-config/N50E085.xml"
         },
         "projection": "spherical mercator",
         "metatile": {

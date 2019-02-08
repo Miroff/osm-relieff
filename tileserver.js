@@ -8,7 +8,7 @@ strata.layer('contours')
   .route('*.png')
   //.use(multimapnik())
   .use(mapnik({
-     pathname: 'mapnik-psql.xml',
+     pathname: 'mapnik-config/N50E085.xml',
      tileSize: 256,
      poolSize: 4
   }))
